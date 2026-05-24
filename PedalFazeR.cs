@@ -151,6 +151,21 @@ namespace PedalFazeR
         [ParameterDecl(Name = "Volume", MinValue = 0, MaxValue = 127, DefValue = 100)]
         public int Volume { get; set; } = 100;
 
+        // ── New in v1.1 — appended so v1.0.x preset indices stay valid (Build §3.3) ──
+        [ParameterDecl(Name = "DCW Track", MinValue = 0, MaxValue = 127, DefValue = 64)]
+        public int DcwTrack { get; set; } = 64;            // 64 = none; bipolar (brighter up / inverse down)
+        [ParameterDecl(Name = "LFO Sync", MinValue = 0, MaxValue = 1, DefValue = 0,
+            ValueDescriptions = new[] { "Free", "Sync" })]
+        public int LfoSync { get; set; } = 0;
+        [ParameterDecl(Name = "LFO Division", MinValue = 0, MaxValue = 7, DefValue = 2,
+            ValueDescriptions = new[] { "1/1", "1/2", "1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32" })]
+        public int LfoDivision { get; set; } = 2;
+        [ParameterDecl(Name = "Noise Level", MinValue = 0, MaxValue = 127, DefValue = 0)]
+        public int NoiseLevel { get; set; } = 0;
+
+        // LFO cycles-per-beat for each division (beat = quarter note).
+        static readonly float[] _syncCyc = { 0.25f, 0.5f, 1f, 2f, 3f, 4f, 6f, 8f };
+
         // ── Track parameters (group 2) ─────────────────────────────────────────
         // Note is the trigger (stateless = each row is an event, not a held value).
         [ParameterDecl(IsStateless = true)]
@@ -260,7 +275,7 @@ namespace PedalFazeR
             // Sample-rate change (Core §29) — reset filter/decimator state on real changes.
             if (sr != _lastSr)
             {
-                foreach (var v in _voices) { v.Tone.Reset(); v.Dec.Reset(); }
+                foreach (var v in _voices) { v.Tone.Reset(); v.Dec.Reset(); v.Noise.Reset(); }
                 _lastSr = sr;
             }
 
@@ -331,7 +346,20 @@ namespace PedalFazeR
             c.LfoPitch  = LfoPitch * (1f / 127f) * 12f;   // up to ±1 octave
             c.LfoAmp    = LfoAmp   * (1f / 127f);
             c.LfoWaveform = (LfoWave)LfoWaveSel;
-            c.LfoInc    = DspMath.TimeMap(LfoRate, 0.05f, 30f) / sr;   // 0.05..30 Hz (TimeMap reused as Hz map)
+            if (LfoSync == 1)
+            {
+                float bpm = host?.MasterInfo?.BeatsPerMin ?? 120f;
+                if (bpm < 1f) bpm = 120f;
+                int div = (LfoDivision >= 0 && LfoDivision < _syncCyc.Length) ? LfoDivision : 2;
+                c.LfoInc = (bpm / 60f) * _syncCyc[div] / sr;       // tempo-locked
+            }
+            else
+            {
+                c.LfoInc = DspMath.TimeMap(LfoRate, 0.05f, 30f) / sr;   // free, 0.05..30 Hz
+            }
+
+            c.DcwTrackAmt = (DcwTrack - 64) / 63f;     // [-1,1]
+            c.NoiseLevel  = NoiseLevel * (1f / 127f);
 
             c.ToneFcBase = 30f * DspMath.FastPow2((Tone / 127f) * 9.5f);  // ~30 Hz .. ~21 kHz
             c.ToneTrack  = ToneTrack * (1f / 127f);

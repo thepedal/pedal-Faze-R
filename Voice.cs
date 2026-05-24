@@ -30,6 +30,10 @@ namespace PedalFazeR
 
         public float   AmpVel;        // 0..1
         public float   PortaCoef;     // 0 = instant glide
+
+        // v1.1
+        public float   DcwTrackAmt;   // [-1,1] DCW key-tracking amount
+        public float   NoiseLevel;    // 0..1
     }
 
     internal sealed class Voice
@@ -42,6 +46,7 @@ namespace PedalFazeR
         public readonly Lfo        Lfo;
         public readonly TptLowpass Tone     = new TptLowpass();
         public readonly Decimator  Dec      = new Decimator();
+        public readonly Noise      Noise;
 
         public float TargetMidi = 60f, CurrentMidi = 60f;
         public float Velocity   = 100f;     // 0..127, read live
@@ -50,7 +55,7 @@ namespace PedalFazeR
         public bool  HasNoteOn, HasNoteOff;
         public byte  PendingNote;
 
-        public Voice(uint seed) { Lfo = new Lfo(seed); }
+        public Voice(uint seed) { Lfo = new Lfo(seed); Noise = new Noise(seed ^ 0x5BD1E995u); }
 
         public bool IsActive => AmpEnv.IsActive;
 
@@ -71,7 +76,7 @@ namespace PedalFazeR
                 CurrentMidi = midi;              // snap — no glide from rest
                 // Silent moment: safe to reset state with no click (M1 §5).
                 Osc1.Reset(); Osc2.Reset();
-                Tone.Reset(); Dec.Reset();
+                Tone.Reset(); Dec.Reset(); Noise.Reset();
             }
             AmpEnv.NoteOn();
             DcwEnv.NoteOn();
@@ -116,9 +121,10 @@ namespace PedalFazeR
                 float penv = PitchEnv.Tick();
                 float lfo  = Lfo.Tick(c.LfoWaveform, c.LfoInc);
 
-                // effective DCW (envelope depth scaled by velocity + LFO wobble)
+                // effective DCW (envelope depth scaled by velocity + LFO wobble + key track)
                 float dcwEnvAmt = c.DcwEnvDepth * (1f - c.DcwVel + c.DcwVel * velN);
-                float dMod = dcwEnvAmt * denv + c.DcwLfoDepth * lfo;
+                float dcwTrack  = c.DcwTrackAmt * ((CurrentMidi - 60f) / 12f) * 0.4f;  // ±0.4/oct at full
+                float dMod = dcwEnvAmt * denv + c.DcwLfoDepth * lfo + dcwTrack;
                 float d1 = c.Dcw1Base + dMod; d1 = d1 < 0f ? 0f : (d1 > 0.999f ? 0.999f : d1);
                 float d2 = c.Dcw2Base + dMod; d2 = d2 < 0f ? 0f : (d2 > 0.999f ? 0.999f : d2);
 
@@ -148,6 +154,7 @@ namespace PedalFazeR
                     Dec.Push(mix);
                 }
                 float monoS = Dec.Read();
+                if (c.NoiseLevel > 0f) monoS += Noise.Tick() * c.NoiseLevel;
 
                 // tone filter (control-rate coefficient updates — M1 §9, gate on i)
                 if ((i & 15) == 0)

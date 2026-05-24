@@ -23,6 +23,8 @@ PARAM_INDEX = {
     "Pitch Attack": 25, "Pitch Decay": 26, "Pitch Depth": 27,
     "LFO Wave": 28, "LFO Rate": 29, "LFO Delay": 30, "LFO Pitch": 31, "LFO DCW": 32, "LFO Amp": 33,
     "Tone": 34, "Tone Track": 35, "Tone Res": 36, "Oversample": 37, "Volume": 38,
+    # ── New in v1.1 (appended; v1.0.x preset indices unchanged) ──
+    "DCW Track": 39, "LFO Sync": 40, "LFO Division": 41, "Noise Level": 42,
 }
 
 DEFAULTS = {
@@ -34,6 +36,7 @@ DEFAULTS = {
     "Pitch Attack": 0, "Pitch Decay": 40, "Pitch Depth": 64,
     "LFO Wave": 0, "LFO Rate": 50, "LFO Delay": 0, "LFO Pitch": 0, "LFO DCW": 0, "LFO Amp": 0,
     "Tone": 127, "Tone Track": 0, "Tone Res": 0, "Oversample": 1, "Volume": 100,
+    "DCW Track": 64, "LFO Sync": 0, "LFO Division": 2, "Noise Level": 0,
 }
 
 # Wave indices: 0 Sine 1 Saw 2 Square 3 Pulse 4 ResoSaw 5 ResoTri 6 ResoTrap 7 Saw-Pulse
@@ -133,6 +136,25 @@ PRESETS = {
     "FX - Ring Sweep":     {"OSC1 Wave": 1, "OSC2 Wave": 1, "OSC2 Level": 110, "OSC2 Semi": 17,
                             "Osc Mode": 1, "DCW Sustain": 90, "DCW Env Amt": 90,
                             "LFO Pitch": 14, "LFO Rate": 24, "Amp Sustain": 115, "Amp Release": 55},
+
+    # ── v1.1 feature showcases ───────────────────────────────────────
+    "Pluck - Noise Click": {"OSC1 Wave": 1, "OSC1 DCW": 0, "DCW Decay": 30, "DCW Sustain": 10, "DCW Env Amt": 110,
+                            "Amp Decay": 36, "Amp Sustain": 0, "Amp Release": 24, "Amp Vel": 95,
+                            "Noise Level": 55},
+    "FX - Noise Sweep":    {"OSC1 Wave": 4, "OSC1 DCW": 0, "DCW Attack": 35, "DCW Decay": 80,
+                            "DCW Sustain": 70, "DCW Env Amt": 120, "Amp Attack": 25, "Amp Sustain": 110,
+                            "Amp Release": 60, "Noise Level": 40},
+    "Lead - Sync Wobble":  {"OSC1 Wave": 1, "OSC1 DCW": 25, "DCW Sustain": 100, "DCW Env Amt": 50,
+                            "LFO Sync": 1, "LFO Division": 3, "LFO DCW": 55,
+                            "Amp Sustain": 118, "Amp Release": 35},
+    "Bass - Synced Wah":   {"OSC1 Wave": 4, "OSC1 Octave": 1, "OSC1 DCW": 20, "DCW Sustain": 90, "DCW Env Amt": 40,
+                            "LFO Sync": 1, "LFO Division": 5, "LFO DCW": 70,
+                            "Amp Decay": 70, "Amp Sustain": 95, "Amp Release": 20},
+    "Pad - Bright Track":  {"OSC1 Wave": 1, "OSC2 Wave": 1, "OSC2 Level": 95, "OSC2 Fine": 57,
+                            "DCW Attack": 55, "DCW Sustain": 80, "DCW Env Amt": 60, "DCW Track": 100,
+                            "Amp Attack": 50, "Amp Sustain": 115, "Amp Release": 85},
+    "Keys - Reso Track":   {"OSC1 Wave": 5, "OSC1 DCW": 20, "DCW Decay": 55, "DCW Sustain": 40, "DCW Env Amt": 85,
+                            "DCW Track": 96, "Amp Decay": 80, "Amp Sustain": 35, "Amp Release": 40, "Amp Vel": 85},
 }
 
 

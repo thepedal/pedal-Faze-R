@@ -27,10 +27,14 @@ and the reason it sounds like PD rather than a subtractive synth.
   base DCW, level, and one of eight waveshapes.
 - **Osc Mode**: Mix, Ring (osc1 × osc2), or Sync (osc2 hard-synced to osc1).
 - **DCW envelope** (Attack/Decay/Sustain/Release + depth + velocity) sweeps the
-  harmonic content of both oscillators — the classic CZ "filterless filter".
+  harmonic content of both oscillators — the classic CZ "filterless filter" —
+  with optional **key-tracking** so brightness/formant follows pitch.
 - **Amp envelope** (DCA) with velocity sensitivity.
 - **Pitch envelope** (one-shot AD, bipolar depth) for blips and drops.
-- **LFO** (Tri/Saw/Square/S&H/Sine) with delay, routable to pitch, DCW and amp.
+- **LFO** (Tri/Saw/Square/S&H/Sine) with delay, routable to pitch, DCW and amp,
+  running **free or tempo-synced** (1/1…1/32, incl. triplets).
+- **Noise** — a per-voice pink-ish source into the mix, shaped by the amp
+  envelope (breathy pads, percussive attacks).
 - **Tone**: a gentle non-resonant 2-pole low-pass with optional key-follow —
   brightness still comes from the DCW; this is just a tone shaper.
 - **Oversample**: Off / 2× / 4× anti-aliasing. PD aliases at high distortion and
@@ -107,6 +111,19 @@ rebuild to refresh. Only the `.dll` and the `.prs.xml` are needed at runtime;
   a second LFO, per-osc DCW envelopes, and tempo-synced LFO rates.
 
 ## Changelog
+
+### v1.1
+- **DCW key-tracking** (`DCW Track`) — DCW follows pitch (bipolar; 64 = off). On
+  the resonant shapes this makes the formant track the keyboard like a filter
+  with key-follow.
+- **Tempo-synced LFO** (`LFO Sync` + `LFO Division`) — lock the LFO to host
+  tempo from 1/1 down to 1/32 (incl. 1/8T, 1/16T) for rhythmic wobble/gating;
+  `Free` keeps the existing rate knob.
+- **Noise source** (`Noise Level`) — per-voice pink-ish noise into the mix
+  before the amp stage, so the DCA shapes it (breath on pads, transients on
+  plucks). Level-matched to a unity oscillator.
+- Six demo presets added; the four new params append after `Volume` (indices
+  39–42), so all v1.0.x presets are unaffected.
 
 ### v1.0.1
 - **Polyphonic headroom.** Voice sum is scaled ~−8 dB before the soft clip so
