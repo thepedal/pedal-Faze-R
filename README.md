@@ -14,25 +14,27 @@ and the reason it sounds like PD rather than a subtractive synth.
 ## Voice architecture
 
 ```
-  PD OSC1 ─┐
+  PD OSC1 ─┐  ← DCW env 1
            ├─ mix / ring / sync ─→ Tone (gentle LP) ─→ DCA ─→ voice out
-  PD OSC2 ─┘
+  PD OSC2 ─┘  ← DCW env 1 (or its own DCW env 2)
        │                 │            │
-   DCW env (wave) ────────┘    Amp env (DCA)
+   DCW env(s) (wave) ─────┘    Amp env (DCA)
    Pitch env (DCO) → osc pitch
-   LFO → pitch (vibrato) / DCW (wave wobble) / amp (tremolo)
+   LFO 1 + LFO 2 → pitch (vibrato) / DCW (wave wobble) / amp (tremolo)
 ```
 
 - **Two PD oscillators**, each with independent octave / semitone / fine tune,
   base DCW, level, and one of eight waveshapes.
 - **Osc Mode**: Mix, Ring (osc1 × osc2), or Sync (osc2 hard-synced to osc1).
 - **DCW envelope** (Attack/Decay/Sustain/Release + depth + velocity) sweeps the
-  harmonic content of both oscillators — the classic CZ "filterless filter" —
-  with optional **key-tracking** so brightness/formant follows pitch.
+  harmonic content — the classic CZ "filterless filter" — with optional
+  **key-tracking** so brightness/formant follows pitch. Osc2 can run its **own
+  independent DCW envelope** (DCW2 Env), so the two PD lines evolve separately.
 - **Amp envelope** (DCA) with velocity sensitivity.
 - **Pitch envelope** (one-shot AD, bipolar depth) for blips and drops.
-- **LFO** (Tri/Saw/Square/S&H/Sine) with delay, routable to pitch, DCW and amp,
-  running **free or tempo-synced** (1/1…1/32, incl. triplets).
+- **Two LFOs** (Tri/Saw/Square/S&H/Sine) with delay, each routable to pitch, DCW
+  and amp and running **free or tempo-synced** (1/1…1/32, incl. triplets) — layer
+  a slow formant sweep under a fast vibrato, etc.
 - **Noise** — a per-voice pink-ish source into the mix, shaped by the amp
   envelope (breathy pads, percussive attacks).
 - **Tone**: a gentle non-resonant 2-pole low-pass with optional key-follow —
@@ -111,6 +113,18 @@ rebuild to refresh. Only the `.dll` and the `.prs.xml` are needed at runtime;
   a second LFO, per-osc DCW envelopes, and tempo-synced LFO rates.
 
 ## Changelog
+
+### v1.2
+- **Independent per-oscillator DCW envelope.** Osc2 can run its own DCW
+  (Attack/Decay/Sustain/Release + depth) via the **DCW2 Env** toggle — the two PD
+  lines evolve their harmonic content separately, the most CZ-authentic upgrade
+  short of full multi-stage envelopes. Defaults **Off** (osc2 follows envelope 1),
+  so existing presets are bit-identical.
+- **Second LFO.** A second per-voice LFO (Tri/Saw/Square/S&H/Sine, delay, free or
+  tempo-synced) with its own routing to pitch / DCW / amp. All depths default 0
+  (no effect), so existing presets are unaffected.
+- 14 params appended at indices 43–56; three demo presets added (Pad - Two Lines,
+  Lead - Dual Mod, FX - Cross Sweep) → 39 total.
 
 ### v1.1.1
 - **Trigger-click fix.** The amp envelope's attack and release are floored to

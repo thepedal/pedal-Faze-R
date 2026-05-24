@@ -34,6 +34,15 @@ namespace PedalFazeR
         // v1.1
         public float   DcwTrackAmt;   // [-1,1] DCW key-tracking amount
         public float   NoiseLevel;    // 0..1
+
+        // v1.2
+        public bool    Dcw2EnvOn;     // osc2 uses its own DCW envelope
+        public float   Dcw2EnvDepth;  // 0..1
+        public LfoWave Lfo2Waveform;
+        public float   Lfo2Inc;       // per output sample
+        public float   Lfo2Pitch;     // semitones
+        public float   Lfo2DcwDepth;  // 0..1
+        public float   Lfo2Amp;       // 0..1 tremolo depth
     }
 
     internal sealed class Voice
@@ -42,8 +51,10 @@ namespace PedalFazeR
         public readonly PDOsc      Osc2     = new PDOsc();
         public readonly Adsr       AmpEnv   = new Adsr();
         public readonly Adsr       DcwEnv   = new Adsr();
+        public readonly Adsr       DcwEnv2  = new Adsr();
         public readonly AdEnv      PitchEnv = new AdEnv();
         public readonly Lfo        Lfo;
+        public readonly Lfo        Lfo2;
         public readonly TptLowpass Tone     = new TptLowpass();
         public readonly Decimator  Dec      = new Decimator();
         public readonly Noise      Noise;
@@ -55,14 +66,19 @@ namespace PedalFazeR
         public bool  HasNoteOn, HasNoteOff;
         public byte  PendingNote;
 
-        public Voice(uint seed) { Lfo = new Lfo(seed); Noise = new Noise(seed ^ 0x5BD1E995u); }
+        public Voice(uint seed)
+        {
+            Lfo   = new Lfo(seed);
+            Lfo2  = new Lfo(seed * 0x85EBCA6Bu + 0x165667B1u);   // decorrelated S&H
+            Noise = new Noise(seed ^ 0x5BD1E995u);
+        }
 
         public bool IsActive => AmpEnv.IsActive;
 
         public void QueueNoteOn(byte n) { PendingNote = n; HasNoteOn = true; }
         public void QueueNoteOff()      { HasNoteOff = true; }
 
-        public void NoteOn(int lfoDelaySamps)
+        public void NoteOn(int lfoDelaySamps, int lfo2DelaySamps)
         {
             byte b   = PendingNote;
             int  oct = b >> 4;
@@ -80,14 +96,17 @@ namespace PedalFazeR
             }
             AmpEnv.NoteOn();
             DcwEnv.NoteOn();
+            DcwEnv2.NoteOn();
             PitchEnv.NoteOn();
             Lfo.NoteOn(lfoDelaySamps);
+            Lfo2.NoteOn(lfo2DelaySamps);
         }
 
         public void NoteOff()
         {
             AmpEnv.NoteOff();
             DcwEnv.NoteOff();
+            DcwEnv2.NoteOff();
             // Pitch AD env is one-shot; let it finish.
         }
 
@@ -95,6 +114,7 @@ namespace PedalFazeR
         {
             AmpEnv.ForcedRelease(sr);
             DcwEnv.ForcedRelease(sr);
+            DcwEnv2.ForcedRelease(sr);
         }
 
         public void Render(in RenderCtx c, float[] mono, int n)
@@ -116,20 +136,27 @@ namespace PedalFazeR
                 else CurrentMidi = TargetMidi;
 
                 // control-rate sources (one per output sample)
-                float aenv = AmpEnv.Tick();
-                float denv = DcwEnv.Tick();
-                float penv = PitchEnv.Tick();
-                float lfo  = Lfo.Tick(c.LfoWaveform, c.LfoInc);
+                float aenv  = AmpEnv.Tick();
+                float denv  = DcwEnv.Tick();
+                float denv2 = DcwEnv2.Tick();      // always ticked (cheap); used if engaged
+                float penv  = PitchEnv.Tick();
+                float lfo   = Lfo.Tick(c.LfoWaveform, c.LfoInc);
+                float lfo2  = Lfo2.Tick(c.Lfo2Waveform, c.Lfo2Inc);
 
-                // effective DCW (envelope depth scaled by velocity + LFO wobble + key track)
-                float dcwEnvAmt = c.DcwEnvDepth * (1f - c.DcwVel + c.DcwVel * velN);
-                float dcwTrack  = c.DcwTrackAmt * ((CurrentMidi - 60f) / 12f) * 0.4f;  // ±0.4/oct at full
-                float dMod = dcwEnvAmt * denv + c.DcwLfoDepth * lfo + dcwTrack;
-                float d1 = c.Dcw1Base + dMod; d1 = d1 < 0f ? 0f : (d1 > 0.999f ? 0.999f : d1);
-                float d2 = c.Dcw2Base + dMod; d2 = d2 < 0f ? 0f : (d2 > 0.999f ? 0.999f : d2);
+                // effective DCW — env per osc (osc2 optionally on its own envelope),
+                // plus shared key-track and both LFOs' DCW routing.
+                float velScale   = 1f - c.DcwVel + c.DcwVel * velN;
+                float dcwEnvAmt  = c.DcwEnvDepth  * velScale;
+                float dcwEnv2Amt = c.Dcw2EnvDepth * velScale;
+                float dcwTrack   = c.DcwTrackAmt * ((CurrentMidi - 60f) / 12f) * 0.4f;
+                float dcwLfo     = c.DcwLfoDepth * lfo + c.Lfo2DcwDepth * lfo2;
+                float dMod1 = dcwEnvAmt * denv + dcwLfo + dcwTrack;
+                float dMod2 = (c.Dcw2EnvOn ? dcwEnv2Amt * denv2 : dcwEnvAmt * denv) + dcwLfo + dcwTrack;
+                float d1 = c.Dcw1Base + dMod1; d1 = d1 < 0f ? 0f : (d1 > 0.999f ? 0.999f : d1);
+                float d2 = c.Dcw2Base + dMod2; d2 = d2 < 0f ? 0f : (d2 > 0.999f ? 0.999f : d2);
 
                 // pitch
-                float pitchMod = penv * c.PitchEnvDepth + lfo * c.LfoPitch;
+                float pitchMod = penv * c.PitchEnvDepth + lfo * c.LfoPitch + lfo2 * c.Lfo2Pitch;
                 float baseMidi = CurrentMidi + pitchMod;
                 float f1 = DspMath.MidiToHz(baseMidi + c.Tune1);
                 float f2 = DspMath.MidiToHz(baseMidi + c.Tune2);
@@ -169,10 +196,10 @@ namespace PedalFazeR
                 }
                 float filtered = Tone.Process(monoS);
 
-                // amp + tremolo
+                // amp + tremolo (both LFOs)
                 float amp = aenv * (1f - c.AmpVel + c.AmpVel * velN);
-                if (c.LfoAmp > 0f)
-                    amp *= 1f - c.LfoAmp * 0.5f * (1f - lfo);  // lfo -1..1 -> dip to (1-depth)
+                if (c.LfoAmp  > 0f) amp *= 1f - c.LfoAmp  * 0.5f * (1f - lfo);
+                if (c.Lfo2Amp > 0f) amp *= 1f - c.Lfo2Amp * 0.5f * (1f - lfo2);
 
                 mono[i] += filtered * amp;
             }

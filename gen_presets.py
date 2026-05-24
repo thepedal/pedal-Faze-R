@@ -25,6 +25,11 @@ PARAM_INDEX = {
     "Tone": 34, "Tone Track": 35, "Tone Res": 36, "Oversample": 37, "Volume": 38,
     # ── New in v1.1 (appended; v1.0.x preset indices unchanged) ──
     "DCW Track": 39, "LFO Sync": 40, "LFO Division": 41, "Noise Level": 42,
+    # ── New in v1.2 ──
+    "DCW2 Env": 43, "DCW2 Attack": 44, "DCW2 Decay": 45, "DCW2 Sustain": 46,
+    "DCW2 Release": 47, "DCW2 Env Amt": 48,
+    "LFO2 Wave": 49, "LFO2 Rate": 50, "LFO2 Sync": 51, "LFO2 Division": 52,
+    "LFO2 Delay": 53, "LFO2 Pitch": 54, "LFO2 DCW": 55, "LFO2 Amp": 56,
 }
 
 DEFAULTS = {
@@ -37,6 +42,10 @@ DEFAULTS = {
     "LFO Wave": 0, "LFO Rate": 50, "LFO Delay": 0, "LFO Pitch": 0, "LFO DCW": 0, "LFO Amp": 0,
     "Tone": 127, "Tone Track": 0, "Tone Res": 0, "Oversample": 1, "Volume": 100,
     "DCW Track": 64, "LFO Sync": 0, "LFO Division": 2, "Noise Level": 0,
+    "DCW2 Env": 0, "DCW2 Attack": 0, "DCW2 Decay": 70, "DCW2 Sustain": 80,
+    "DCW2 Release": 50, "DCW2 Env Amt": 90,
+    "LFO2 Wave": 0, "LFO2 Rate": 50, "LFO2 Sync": 0, "LFO2 Division": 2,
+    "LFO2 Delay": 0, "LFO2 Pitch": 0, "LFO2 DCW": 0, "LFO2 Amp": 0,
 }
 
 # Wave indices: 0 Sine 1 Saw 2 Square 3 Pulse 4 ResoSaw 5 ResoTri 6 ResoTrap 7 Saw-Pulse
@@ -155,6 +164,21 @@ PRESETS = {
                             "Amp Attack": 50, "Amp Sustain": 115, "Amp Release": 85},
     "Keys - Reso Track":   {"OSC1 Wave": 5, "OSC1 DCW": 20, "DCW Decay": 55, "DCW Sustain": 40, "DCW Env Amt": 85,
                             "DCW Track": 96, "Amp Decay": 80, "Amp Sustain": 35, "Amp Release": 40, "Amp Vel": 85},
+
+    # ── v1.2 feature showcases ───────────────────────────────────────
+    "Pad - Two Lines":     {"OSC1 Wave": 1, "OSC2 Wave": 4, "OSC2 Level": 95, "OSC2 Fine": 56,
+                            "DCW Attack": 50, "DCW Decay": 90, "DCW Sustain": 75, "DCW Env Amt": 70,
+                            "DCW2 Env": 1, "DCW2 Attack": 90, "DCW2 Decay": 110, "DCW2 Sustain": 55, "DCW2 Env Amt": 100,
+                            "Amp Attack": 55, "Amp Sustain": 115, "Amp Release": 90},
+    "Lead - Dual Mod":     {"OSC1 Wave": 1, "OSC1 DCW": 25, "DCW Sustain": 100, "DCW Env Amt": 50,
+                            "LFO Pitch": 7, "LFO Rate": 64, "LFO Delay": 40,
+                            "LFO2 DCW": 45, "LFO2 Sync": 1, "LFO2 Division": 2,
+                            "Amp Sustain": 118, "Amp Release": 35},
+    "FX - Cross Sweep":    {"OSC1 Wave": 4, "OSC2 Wave": 4, "OSC2 Level": 90, "OSC2 Semi": 19,
+                            "DCW Attack": 20, "DCW Decay": 70, "DCW Sustain": 60, "DCW Env Amt": 120,
+                            "DCW2 Env": 1, "DCW2 Attack": 80, "DCW2 Decay": 100, "DCW2 Sustain": 80, "DCW2 Env Amt": 120,
+                            "LFO2 DCW": 35, "LFO2 Rate": 30,
+                            "Amp Attack": 25, "Amp Sustain": 115, "Amp Release": 55},
 }
 
 

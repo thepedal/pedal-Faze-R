@@ -163,8 +163,58 @@ namespace PedalFazeR
         [ParameterDecl(Name = "Noise Level", MinValue = 0, MaxValue = 127, DefValue = 0)]
         public int NoiseLevel { get; set; } = 0;
 
-        // LFO cycles-per-beat for each division (beat = quarter note).
+        // LFO cycles-per-beat for each division (beat = quarter note). Shared by both LFOs.
         static readonly float[] _syncCyc = { 0.25f, 0.5f, 1f, 2f, 3f, 4f, 6f, 8f };
+
+        // ── New in v1.2 — appended so v1.0.x/v1.1 preset indices stay valid (Build §3.3) ──
+        // Per-osc DCW envelope: osc2 can run its own DCW (wave) envelope.
+        [ParameterDecl(Name = "DCW2 Env", MinValue = 0, MaxValue = 1, DefValue = 0,
+            ValueDescriptions = new[] { "Off", "On" })]
+        public int Dcw2Env { get; set; } = 0;          // Off = osc2 follows envelope 1 (back-compat)
+        [ParameterDecl(Name = "DCW2 Attack", MinValue = 0, MaxValue = 127, DefValue = 0)]
+        public int Dcw2Attack { get; set; } = 0;
+        [ParameterDecl(Name = "DCW2 Decay", MinValue = 0, MaxValue = 127, DefValue = 70)]
+        public int Dcw2Decay { get; set; } = 70;
+        [ParameterDecl(Name = "DCW2 Sustain", MinValue = 0, MaxValue = 127, DefValue = 80)]
+        public int Dcw2Sustain { get; set; } = 80;
+        [ParameterDecl(Name = "DCW2 Release", MinValue = 0, MaxValue = 127, DefValue = 50)]
+        public int Dcw2Release { get; set; } = 50;
+        [ParameterDecl(Name = "DCW2 Env Amt", MinValue = 0, MaxValue = 127, DefValue = 90)]
+        public int Dcw2EnvAmt { get; set; } = 90;
+
+        // Second LFO (free or tempo-synced), routable to pitch / DCW / amp.
+        [ParameterDecl(Name = "LFO2 Wave", MinValue = 0, MaxValue = 4, DefValue = 0,
+            ValueDescriptions = new[] { "Tri", "Saw", "Square", "S&H", "Sine" })]
+        public int Lfo2Wave { get; set; } = 0;
+        [ParameterDecl(Name = "LFO2 Rate", MinValue = 0, MaxValue = 127, DefValue = 50)]
+        public int Lfo2Rate { get; set; } = 50;
+        [ParameterDecl(Name = "LFO2 Sync", MinValue = 0, MaxValue = 1, DefValue = 0,
+            ValueDescriptions = new[] { "Free", "Sync" })]
+        public int Lfo2Sync { get; set; } = 0;
+        [ParameterDecl(Name = "LFO2 Division", MinValue = 0, MaxValue = 7, DefValue = 2,
+            ValueDescriptions = new[] { "1/1", "1/2", "1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32" })]
+        public int Lfo2Division { get; set; } = 2;
+        [ParameterDecl(Name = "LFO2 Delay", MinValue = 0, MaxValue = 127, DefValue = 0)]
+        public int Lfo2Delay { get; set; } = 0;
+        [ParameterDecl(Name = "LFO2 Pitch", MinValue = 0, MaxValue = 127, DefValue = 0)]
+        public int Lfo2Pitch { get; set; } = 0;
+        [ParameterDecl(Name = "LFO2 DCW", MinValue = 0, MaxValue = 127, DefValue = 0)]
+        public int Lfo2Dcw { get; set; } = 0;
+        [ParameterDecl(Name = "LFO2 Amp", MinValue = 0, MaxValue = 127, DefValue = 0)]
+        public int Lfo2Amp { get; set; } = 0;
+
+        // Free or tempo-locked LFO increment per output sample.
+        float LfoIncFor(int sync, int rateParam, int division, int sr)
+        {
+            if (sync == 1)
+            {
+                float bpm = host?.MasterInfo?.BeatsPerMin ?? 120f;
+                if (bpm < 1f) bpm = 120f;
+                int div = (division >= 0 && division < _syncCyc.Length) ? division : 2;
+                return (bpm / 60f) * _syncCyc[div] / sr;
+            }
+            return DspMath.TimeMap(rateParam, 0.05f, 30f) / sr;   // free, 0.05..30 Hz
+        }
 
         // ── Track parameters (group 2) ─────────────────────────────────────────
         // Note is the trigger (stateless = each row is an event, not a held value).
@@ -288,12 +338,13 @@ namespace PedalFazeR
             _wasPlaying = nowPlaying;
 
             // Drain pending note events (note-on before note-off — SH101 §6.3).
-            int lfoDelay = (int)(DspMath.TimeMap(LfoDelay, 0.0001f, 3f) * sr);
+            int lfoDelay  = (int)(DspMath.TimeMap(LfoDelay,  0.0001f, 3f) * sr);
+            int lfo2Delay = (int)(DspMath.TimeMap(Lfo2Delay, 0.0001f, 3f) * sr);
             for (int i = 0; i < MAX_VOICES; i++)
             {
                 var v = _voices[i];
-                if (v.HasNoteOn)  { v.NoteOn(lfoDelay); v.HasNoteOn = false; }
-                if (v.HasNoteOff) { v.NoteOff();        v.HasNoteOff = false; }
+                if (v.HasNoteOn)  { v.NoteOn(lfoDelay, lfo2Delay); v.HasNoteOn = false; }
+                if (v.HasNoteOff) { v.NoteOff();                   v.HasNoteOff = false; }
             }
 
             // Resolve per-buffer control context + push envelope coefficients.
@@ -345,21 +396,18 @@ namespace PedalFazeR
             c.PitchEnvDepth = ((PitchDepth - 64) / 63f) * PITCH_ENV_MAX;
             c.LfoPitch  = LfoPitch * (1f / 127f) * 12f;   // up to ±1 octave
             c.LfoAmp    = LfoAmp   * (1f / 127f);
-            c.LfoWaveform = (LfoWave)LfoWaveSel;
-            if (LfoSync == 1)
-            {
-                float bpm = host?.MasterInfo?.BeatsPerMin ?? 120f;
-                if (bpm < 1f) bpm = 120f;
-                int div = (LfoDivision >= 0 && LfoDivision < _syncCyc.Length) ? LfoDivision : 2;
-                c.LfoInc = (bpm / 60f) * _syncCyc[div] / sr;       // tempo-locked
-            }
-            else
-            {
-                c.LfoInc = DspMath.TimeMap(LfoRate, 0.05f, 30f) / sr;   // free, 0.05..30 Hz
-            }
+            c.LfoWaveform  = (LfoWave)LfoWaveSel;
+            c.LfoInc       = LfoIncFor(LfoSync, LfoRate, LfoDivision, sr);
+            c.Lfo2Waveform = (LfoWave)Lfo2Wave;
+            c.Lfo2Inc      = LfoIncFor(Lfo2Sync, Lfo2Rate, Lfo2Division, sr);
+            c.Lfo2Pitch    = Lfo2Pitch * (1f / 127f) * 12f;
+            c.Lfo2DcwDepth = Lfo2Dcw   * (1f / 127f);
+            c.Lfo2Amp      = Lfo2Amp   * (1f / 127f);
 
-            c.DcwTrackAmt = (DcwTrack - 64) / 63f;     // [-1,1]
-            c.NoiseLevel  = NoiseLevel * (1f / 127f);
+            c.DcwTrackAmt  = (DcwTrack - 64) / 63f;     // [-1,1]
+            c.NoiseLevel   = NoiseLevel * (1f / 127f);
+            c.Dcw2EnvOn    = Dcw2Env == 1;
+            c.Dcw2EnvDepth = Dcw2EnvAmt * (1f / 127f);
 
             c.ToneFcBase = 30f * DspMath.FastPow2((Tone / 127f) * 9.5f);  // ~30 Hz .. ~21 kHz
             c.ToneTrack  = ToneTrack * (1f / 127f);
@@ -386,6 +434,11 @@ namespace PedalFazeR
             float dR = DcwRelease == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(DcwRelease, 0.001f, 15f), sr);
             float dS = DcwSustain * (1f / 127f);
 
+            float d2A = Dcw2Attack  == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(Dcw2Attack, 0.0005f, 8f), sr);
+            float d2D = Dcw2Decay   == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(Dcw2Decay, 0.001f, 15f), sr);
+            float d2R = Dcw2Release == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(Dcw2Release, 0.001f, 15f), sr);
+            float d2S = Dcw2Sustain * (1f / 127f);
+
             float aAsec = AmpAttack  == 0 ? MIN_AMP_SEG : MathF.Max(DspMath.TimeMap(AmpAttack, 0.0005f, 8f), MIN_AMP_SEG);
             float aRsec = AmpRelease == 0 ? MIN_AMP_SEG : MathF.Max(DspMath.TimeMap(AmpRelease, 0.001f, 15f), MIN_AMP_SEG);
             float aA = DspMath.Coef(aAsec, sr);
@@ -400,6 +453,7 @@ namespace PedalFazeR
             {
                 _voices[i].AmpEnv.SetCoefs(aA, aD, aS, aR);
                 _voices[i].DcwEnv.SetCoefs(dA, dD, dS, dR);
+                _voices[i].DcwEnv2.SetCoefs(d2A, d2D, d2S, d2R);
                 _voices[i].PitchEnv.SetCoefs(pA, pD);
             }
         }
