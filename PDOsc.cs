@@ -20,9 +20,24 @@ namespace PedalFazeR
         public float Inc;        // increment per (oversampled) sample
         public bool  Wrapped;    // true on the sample where Phase wrapped (osc sync)
 
-        const float KMIN     = 0.0015f;   // min knee width => max brightness
-        const float WMIN     = 0.03f;     // min pulse window
-        const float RESO_MAX = 24f;       // max resonance ratio multiplier
+        const float KMIN    = 0.0015f;   // min knee width => max brightness
+        const float WMIN    = 0.03f;     // min pulse window
+        public const float ResoMax = 24f; // max resonance ratio multiplier
+
+        public static bool IsReso(PDWave w) =>
+            w == PDWave.ResoSaw || w == PDWave.ResoTri || w == PDWave.ResoTrap;
+
+        // Largest DCW a resonant osc may use at this pitch before the formant
+        // carrier (r·f) climbs past ~0.45·sr and aliases (v1.0.1). Musically
+        // lossless — a formant above Nyquist isn't audible anyway. Clamping d
+        // (rather than r) keeps the rest of the DSP unchanged.
+        public static float MaxResoDcw(float freqHz, int sr)
+        {
+            float rMax = 0.45f * sr / MathF.Max(freqHz, 1f);
+            if (rMax <= 1f) return 0f;
+            float d = (rMax - 1f) / (ResoMax - 1f);
+            return d > 0.999f ? 0.999f : d;
+        }
 
         public void Reset() { Phase = 0f; Wrapped = false; }
 
@@ -78,21 +93,21 @@ namespace PedalFazeR
                 }
                 case PDWave.ResoSaw:
                 {
-                    float r = 1f + d * (RESO_MAX - 1f);
+                    float r = 1f + d * (ResoMax - 1f);
                     float k = p * r; k -= MathF.Floor(k);
                     outv = (1f - p) * DspMath.Cos01(k);            // saw window
                     break;
                 }
                 case PDWave.ResoTri:
                 {
-                    float r = 1f + d * (RESO_MAX - 1f);
+                    float r = 1f + d * (ResoMax - 1f);
                     float k = p * r; k -= MathF.Floor(k);
                     outv = (1f - MathF.Abs(1f - 2f * p)) * DspMath.Cos01(k);  // triangle
                     break;
                 }
                 case PDWave.ResoTrap:
                 {
-                    float r = 1f + d * (RESO_MAX - 1f);
+                    float r = 1f + d * (ResoMax - 1f);
                     float k = p * r; k -= MathF.Floor(k);
                     float win = 2f * (1f - p); if (win > 1f) win = 1f;        // trapezoid
                     outv = win * DspMath.Cos01(k);

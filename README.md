@@ -105,3 +105,15 @@ rebuild to refresh. Only the `.dll` and the `.prs.xml` are needed at runtime;
   so DCW sweeps are smooth rather than stepped.
 - Possible later additions (append-only so presets stay valid): a noise source,
   a second LFO, per-osc DCW envelopes, and tempo-synced LFO rates.
+
+## Changelog
+
+### v1.0.1
+- **Polyphonic headroom.** Voice sum is scaled ~−8 dB before the soft clip so
+  chords sum into the clean region instead of hard-clamping (M1 §10 approach).
+  Single notes are correspondingly quieter — set level with Volume / the master.
+- **Resonant anti-alias clamp.** The formant ratio is now capped against pitch
+  so the carrier (`r·f`) can't climb past Nyquist on high notes, removing the
+  top-end crackle on resonant presets. Lossless where audible.
+- **Steeper decimator.** Oversampling FIR lengthened (16·os+1 taps) with a small
+  guard band; alias-region rejection improved from ~−17 dB to ~−75 dB.

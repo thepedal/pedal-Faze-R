@@ -29,6 +29,11 @@ namespace PedalFazeR
 
         const float SAMPLE_SCALE = 32768f;        // Buzz nominal generator range (PedalComp §1)
         const float PITCH_ENV_MAX = 24f;          // pitch env reaches ±2 octaves at the extremes
+        // v1.0.1 — fixed polyphonic headroom (M1 §10). A single voice sits well
+        // below the soft-clip knee so chords sum into the clean/linear region;
+        // the soft clip is only a safety net for dense, loud chords. Trade: per-
+        // voice level is lower — set output level with Volume / the master.
+        const float MIX_HEADROOM = 0.4f;          // ~-8 dB
 
         readonly IBuzzMachineHost host;
         readonly Voice[] _voices = new Voice[MAX_VOICES];
@@ -300,7 +305,7 @@ namespace PedalFazeR
             float volN = Volume * (1f / 127f);
             for (int i = 0; i < n; i++)
             {
-                float s = DspMath.SoftClip(_mono[i] * volN) * SAMPLE_SCALE;
+                float s = DspMath.SoftClip(_mono[i] * MIX_HEADROOM * volN) * SAMPLE_SCALE;
                 output[i].L = s; output[i].R = s;
             }
             return true;

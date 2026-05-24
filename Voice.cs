@@ -127,6 +127,12 @@ namespace PedalFazeR
                 float baseMidi = CurrentMidi + pitchMod;
                 float f1 = DspMath.MidiToHz(baseMidi + c.Tune1);
                 float f2 = DspMath.MidiToHz(baseMidi + c.Tune2);
+
+                // Resonant shapes: cap DCW so the formant carrier (r·f) can't
+                // climb past Nyquist and alias into top-end crackle (v1.0.1).
+                if (PDOsc.IsReso(c.Wave1)) { float m = PDOsc.MaxResoDcw(f1, c.Sr); if (d1 > m) d1 = m; }
+                if (PDOsc.IsReso(c.Wave2)) { float m = PDOsc.MaxResoDcw(f2, c.Sr); if (d2 > m) d2 = m; }
+
                 Osc1.Inc = (f1 / c.Sr) * invOs;
                 Osc2.Inc = (f2 / c.Sr) * invOs;
 

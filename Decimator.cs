@@ -29,9 +29,9 @@ namespace PedalFazeR
 
             if (os == 1) { _h = null; _hist = null; _pos = 0; return; }
 
-            _n = 8 * os + 1;                 // odd length scales with rate
+            _n = 16 * os + 1;                // odd length scales with rate (v1.0.1: steeper)
             _h = new float[_n];
-            float fc = 0.5f / os;            // cutoff, normalised to oversampled Nyquist = 1.0
+            float fc = 0.45f / os;           // cutoff just below base Nyquist (guard band)
             int   m  = _n - 1;
             double sum = 0;
             for (int k = 0; k < _n; k++)
