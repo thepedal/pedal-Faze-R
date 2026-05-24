@@ -42,8 +42,10 @@ namespace PedalFazeR
         }
     }
 
-    // One-pole DC blocker (~5 Hz highpass). Resonant PD shapes carry some DC;
-    // this keeps the summed output centred.
+    // One-pole DC blocker (~5 Hz highpass). NOTE: not currently wired into the
+    // signal path — measured DC from the resonant shapes is negligible (≤0.001
+    // even at ~32 Hz). Kept available in case a future low-pitch/high-reso case
+    // needs it; insert before the amp stage in Voice.Render if so.
     internal sealed class DcBlocker
     {
         float _x1, _y1;

@@ -372,14 +372,25 @@ namespace PedalFazeR
 
         void PushEnvCoefs(int sr)
         {
+            // v1.1.1 — floor the AMP attack/release so they always ramp rather than
+            // step. An instant attack defeats the click-free retrigger (SH101 §6.2):
+            // on a retrigger the envelope would jump from the release-tail level to
+            // 1.0 in one sample, an audible click (worst on looped chords). ~3 ms is
+            // fast enough to feel instant (the decimator already smooths onsets) but
+            // removes the step. DCW/pitch envelopes are modulation, not amplitude, so
+            // they keep their instant option.
+            const float MIN_AMP_SEG = 0.003f;
+
             float dA = DcwAttack  == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(DcwAttack, 0.0005f, 8f), sr);
             float dD = DcwDecay   == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(DcwDecay, 0.001f, 15f), sr);
             float dR = DcwRelease == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(DcwRelease, 0.001f, 15f), sr);
             float dS = DcwSustain * (1f / 127f);
 
-            float aA = AmpAttack  == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(AmpAttack, 0.0005f, 8f), sr);
+            float aAsec = AmpAttack  == 0 ? MIN_AMP_SEG : MathF.Max(DspMath.TimeMap(AmpAttack, 0.0005f, 8f), MIN_AMP_SEG);
+            float aRsec = AmpRelease == 0 ? MIN_AMP_SEG : MathF.Max(DspMath.TimeMap(AmpRelease, 0.001f, 15f), MIN_AMP_SEG);
+            float aA = DspMath.Coef(aAsec, sr);
             float aD = AmpDecay   == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(AmpDecay, 0.001f, 15f), sr);
-            float aR = AmpRelease == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(AmpRelease, 0.001f, 15f), sr);
+            float aR = DspMath.Coef(aRsec, sr);
             float aS = AmpSustain * (1f / 127f);
 
             float pA = PitchAttack == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(PitchAttack, 0.0005f, 4f), sr);

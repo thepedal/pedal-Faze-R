@@ -112,6 +112,16 @@ rebuild to refresh. Only the `.dll` and the `.prs.xml` are needed at runtime;
 
 ## Changelog
 
+### v1.1.1
+- **Trigger-click fix.** The amp envelope's attack and release are floored to
+  ~3 ms so (re)triggers ramp instead of stepping. An instant attack defeated the
+  click-free retrigger (SH101 §6.2): a retriggered voice keeps its oscillator
+  phase, but the envelope jumped from the release tail to full in one sample — an
+  audible click, worst on looped chords. Retrigger step drops ~14 dB (single
+  voice −21 → −37 dB; 6-voice chord −29 → −43 dB). Fresh-note onsets were already
+  clean (the decimator's group delay smooths them). Long/normal envelopes are
+  unchanged — only sub-3 ms attacks/releases are floored.
+
 ### v1.1
 - **DCW key-tracking** (`DCW Track`) — DCW follows pitch (bipolar; 64 = off). On
   the resonant shapes this makes the formant track the keyboard like a filter
