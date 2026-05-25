@@ -103,10 +103,10 @@ rebuild to refresh. Only the `.dll` and the `.prs.xml` are needed at runtime;
 |------|------|
 | `PedalFazeR.cs` | Machine: parameters, note/velocity setters, multi-track recovery, `Work` |
 | `Voice.cs` | Per-voice state and the per-sample render loop |
-| `PDOsc.cs` | Phase-distortion oscillator — the eight waveshapes |
+| `PDOsc.cs` | Phase-distortion oscillator — the ten waveshapes |
 | `Envelope.cs` | ADSR (click-free retrigger, forced release) + AD pitch envelope |
 | `Lfo.cs` | Per-voice LFO |
-| `Filter.cs` | TPT 2-pole low-pass tone control + DC blocker |
+| `Filter.cs` | TPT multimode resonant filter (LP/BP/HP/Notch) + DC blocker |
 | `Decimator.cs` | Windowed-sinc oversampling decimator |
 | `DspMath.cs` | FastPow2, cosine table, soft-clip, helpers |
 | `gen_presets.py` | Preset-bank generator (source only — not deployed) |
@@ -124,17 +124,13 @@ rebuild to refresh. Only the `.dll` and the `.prs.xml` are needed at runtime;
 ## Changelog
 
 ### v1.4.1
-- **Fixed a click on resonant filter patches at note onset** (reported on "Bass -
-  Reso Acid" around C#4). With an instant filter-envelope attack the cutoff
-  slammed wide open on the first sample, and the high-Q filter — hit by the note
-  onset from a cleared state — rang at its cutoff (~9 kHz), an audible ping on
-  every attack. The resonance now **blooms up from zero over ~3 ms** on each
-  fresh note, so Q is low through the onset transient (no ping) and settles in
-  cleanly. Onset delta at C#4 dropped from 0.067 to 0.026 (below the steady-state
-  level). The cutoff is also now **smoothed per sample** instead of stepped every
-  16 samples, which removes a separate zipper on fast/high sweeps; a steady cutoff
-  stays bit-identical (the coefficient cache skips the recompute). No parameter or
-  preset changes; patches without a filter envelope are unaffected.
+- **Preset expansion** → 63 presets. Added a `Bass - Reese` set (Reese Classic,
+  Notch, Hollow, Wide, Neuro, Sub — detuned-saw drones routed through the new
+  Low Pass / Band Pass / Notch modes, with the Neuro variant moving via LFO→DCW
+  on resonant saws), and eleven more `Bell` voices (Tubular, Church, Music Box,
+  Gamelan, Crystal, Mallet, Carillon, Digi Tine, Soft Bell, Glockenspiel, Bell
+  Lead) spanning ring-mod inharmonic metals, Double-Sine shimmer, and percussive
+  DCW decays. No code, parameter, or layout changes — presets only.
 
 ### v1.4
 - **Resonant multimode filter.** The gentle "Tone" lowpass is now a full TPT
@@ -144,13 +140,19 @@ rebuild to refresh. Only the `.dll` and the `.prs.xml` are needed at runtime;
   classic cutoff sweeps. Existing `Tone` / `Tone Track` / `Tone Res` keep their
   meaning. Defaults (Low Pass, env amt centred → no sweep) leave v1.3.x presets
   unchanged. The SVF damping is always > 0 so it can't self-oscillate into a NaN.
+- The filter is **click-free at high resonance**: resonance blooms up from zero
+  over ~3 ms on each fresh note (low Q through the onset transient, so a high-Q
+  filter doesn't ring at its cutoff when hit from a cleared state), and the cutoff
+  is smoothed per sample rather than stepped every 16 samples (no zipper on
+  fast/high sweeps). A steady cutoff stays bit-identical (the coefficient cache
+  skips the recompute).
 - **Two new waveshapes** (Osc Wave now 0–9): `Double Sine` — crossfades from a
   pure sine toward an octave-up double cosine as DCW rises (smooth, band-limited
   at all DCW) — and `Reso Pulse`, a resonant shape with a squared window for a
   harder, more percussive formant burst (covered by the anti-alias DCW clamp).
-- Five demo presets added (Bass - Reso Acid, Lead - Filter Sweep, FX - HP Riser,
-  Pad - Double Sine, Keys - Reso Pulse) → 46 total. Validated by re-fuzzing all
-  67 params incl. every filter mode at full resonance: zero faults.
+- Demo presets added (Bass - Reso Acid, Lead - Filter Sweep, FX - HP Riser,
+  Pad - Double Sine, Keys - Reso Pulse). Validated by re-fuzzing all 67 params
+  incl. every filter mode at full resonance: zero faults.
 
 ### v1.3.1
 - **Fixed an intermittent chorus crash** (silent machine death). In the chorus
