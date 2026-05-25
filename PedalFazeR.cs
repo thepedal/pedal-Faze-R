@@ -54,8 +54,8 @@ namespace PedalFazeR
         // ── CONTRACT (Build §3.3): only ever append; never reorder or insert. ──
 
         // OSC1
-        [ParameterDecl(Name = "OSC1 Wave", MinValue = 0, MaxValue = 7, DefValue = 1,
-            ValueDescriptions = new[] { "Sine", "Saw", "Square", "Pulse", "Reso Saw", "Reso Tri", "Reso Trap", "Saw-Pulse" })]
+        [ParameterDecl(Name = "OSC1 Wave", MinValue = 0, MaxValue = 9, DefValue = 1,
+            ValueDescriptions = new[] { "Sine", "Saw", "Square", "Pulse", "Reso Saw", "Reso Tri", "Reso Trap", "Saw-Pulse", "Double Sine", "Reso Pulse" })]
         public int Osc1Wave { get; set; } = 1;
         [ParameterDecl(Name = "OSC1 Octave", MinValue = 0, MaxValue = 4, DefValue = 2,
             ValueDescriptions = new[] { "-2", "-1", "0", "+1", "+2" })]
@@ -70,8 +70,8 @@ namespace PedalFazeR
         public int Osc1Level { get; set; } = 100;
 
         // OSC2 (off by default — single-oscillator patch out of the box)
-        [ParameterDecl(Name = "OSC2 Wave", MinValue = 0, MaxValue = 7, DefValue = 1,
-            ValueDescriptions = new[] { "Sine", "Saw", "Square", "Pulse", "Reso Saw", "Reso Tri", "Reso Trap", "Saw-Pulse" })]
+        [ParameterDecl(Name = "OSC2 Wave", MinValue = 0, MaxValue = 9, DefValue = 1,
+            ValueDescriptions = new[] { "Sine", "Saw", "Square", "Pulse", "Reso Saw", "Reso Tri", "Reso Trap", "Saw-Pulse", "Double Sine", "Reso Pulse" })]
         public int Osc2Wave { get; set; } = 1;
         [ParameterDecl(Name = "OSC2 Octave", MinValue = 0, MaxValue = 4, DefValue = 2,
             ValueDescriptions = new[] { "-2", "-1", "0", "+1", "+2" })]
@@ -216,6 +216,22 @@ namespace PedalFazeR
         [ParameterDecl(Name = "Chorus Mix", MinValue = 0, MaxValue = 127, DefValue = 50)]
         public int ChorusMix { get; set; } = 50;
 
+        // ── New in v1.4 — resonant multimode filter with its own envelope. ──
+        // Type defaults LP and Env Amt defaults centre (no sweep) → v1.3.x presets unchanged.
+        [ParameterDecl(Name = "Filter Type", MinValue = 0, MaxValue = 3, DefValue = 0,
+            ValueDescriptions = new[] { "Low Pass", "Band Pass", "High Pass", "Notch" })]
+        public int FilterType { get; set; } = 0;
+        [ParameterDecl(Name = "Filter Env Amt", MinValue = 0, MaxValue = 127, DefValue = 64)]
+        public int FilterEnvAmt { get; set; } = 64;     // bipolar; 64 = none (down<64<up)
+        [ParameterDecl(Name = "Filter Attack", MinValue = 0, MaxValue = 127, DefValue = 0)]
+        public int FilterAttack { get; set; } = 0;
+        [ParameterDecl(Name = "Filter Decay", MinValue = 0, MaxValue = 127, DefValue = 60)]
+        public int FilterDecay { get; set; } = 60;
+        [ParameterDecl(Name = "Filter Sustain", MinValue = 0, MaxValue = 127, DefValue = 80)]
+        public int FilterSustain { get; set; } = 80;
+        [ParameterDecl(Name = "Filter Release", MinValue = 0, MaxValue = 127, DefValue = 40)]
+        public int FilterRelease { get; set; } = 40;
+
         // Free or tempo-locked LFO increment per output sample.
         float LfoIncFor(int sync, int rateParam, int division, int sr)
         {
@@ -338,7 +354,7 @@ namespace PedalFazeR
             // Sample-rate change (Core §29) — reset filter/decimator state on real changes.
             if (sr != _lastSr)
             {
-                foreach (var v in _voices) { v.Tone.Reset(); v.Dec.Reset(); v.Noise.Reset(); }
+                foreach (var v in _voices) { v.Filt.Reset(); v.Dec.Reset(); v.Noise.Reset(); }
                 _chorus.Configure(sr);
                 _lastSr = sr;
             }
@@ -456,6 +472,8 @@ namespace PedalFazeR
 
             c.AmpVel    = AmpVel * (1f / 127f);
             c.PortaCoef = Portamento == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(Portamento, 0.005f, 2f), sr);
+            c.FilterType = FilterType;
+            c.FiltEnvAmt = (FilterEnvAmt - 64) / 63f;     // [-1,1]
             return c;
         }
 
@@ -480,6 +498,11 @@ namespace PedalFazeR
             float d2R = Dcw2Release == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(Dcw2Release, 0.001f, 15f), sr);
             float d2S = Dcw2Sustain * (1f / 127f);
 
+            float fA = FilterAttack  == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(FilterAttack, 0.0005f, 8f), sr);
+            float fD = FilterDecay   == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(FilterDecay, 0.001f, 15f), sr);
+            float fR = FilterRelease == 0 ? 0f : DspMath.Coef(DspMath.TimeMap(FilterRelease, 0.001f, 15f), sr);
+            float fS = FilterSustain * (1f / 127f);
+
             float aAsec = AmpAttack  == 0 ? MIN_AMP_SEG : MathF.Max(DspMath.TimeMap(AmpAttack, 0.0005f, 8f), MIN_AMP_SEG);
             float aRsec = AmpRelease == 0 ? MIN_AMP_SEG : MathF.Max(DspMath.TimeMap(AmpRelease, 0.001f, 15f), MIN_AMP_SEG);
             float aA = DspMath.Coef(aAsec, sr);
@@ -495,6 +518,7 @@ namespace PedalFazeR
                 _voices[i].AmpEnv.SetCoefs(aA, aD, aS, aR);
                 _voices[i].DcwEnv.SetCoefs(dA, dD, dS, dR);
                 _voices[i].DcwEnv2.SetCoefs(d2A, d2D, d2S, d2R);
+                _voices[i].FiltEnv.SetCoefs(fA, fD, fS, fR);
                 _voices[i].PitchEnv.SetCoefs(pA, pD);
             }
         }

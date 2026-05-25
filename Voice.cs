@@ -43,6 +43,10 @@ namespace PedalFazeR
         public float   Lfo2Pitch;     // semitones
         public float   Lfo2DcwDepth;  // 0..1
         public float   Lfo2Amp;       // 0..1 tremolo depth
+
+        // v1.4
+        public int     FilterType;    // 0 LP, 1 BP, 2 HP, 3 Notch
+        public float   FiltEnvAmt;    // [-1,1] cutoff sweep amount
     }
 
     internal sealed class Voice
@@ -52,15 +56,20 @@ namespace PedalFazeR
         public readonly Adsr       AmpEnv   = new Adsr();
         public readonly Adsr       DcwEnv   = new Adsr();
         public readonly Adsr       DcwEnv2  = new Adsr();
+        public readonly Adsr       FiltEnv  = new Adsr();
         public readonly AdEnv      PitchEnv = new AdEnv();
         public readonly Lfo        Lfo;
         public readonly Lfo        Lfo2;
-        public readonly TptLowpass Tone     = new TptLowpass();
+        public readonly TptSvf     Filt     = new TptSvf();
         public readonly Decimator  Dec      = new Decimator();
         public readonly Noise      Noise;
 
         public float TargetMidi = 60f, CurrentMidi = 60f;
         public float Velocity   = 100f;     // 0..127, read live
+
+        const float FILT_ENV_OCT = 6f;      // filter envelope sweeps cutoff up to ±6 octaves
+        float _fcSmooth = -1f;              // one-pole smoothed cutoff (-1 = snap on next note)
+        float _resSmooth;                   // smoothed resonance — blooms from 0 each fresh note
 
         // Pending events drained at the top of the machine's Work (SH101 §6.3).
         public bool  HasNoteOn, HasNoteOff;
@@ -92,11 +101,14 @@ namespace PedalFazeR
                 CurrentMidi = midi;              // snap — no glide from rest
                 // Silent moment: safe to reset state with no click (M1 §5).
                 Osc1.Reset(); Osc2.Reset();
-                Tone.Reset(); Dec.Reset(); Noise.Reset();
+                Filt.Reset(); Dec.Reset(); Noise.Reset();
+                _fcSmooth = -1f;                 // snap filter cutoff to target on this fresh note
+                _resSmooth = 0f;                 // and bloom resonance up from zero (no onset ping)
             }
             AmpEnv.NoteOn();
             DcwEnv.NoteOn();
             DcwEnv2.NoteOn();
+            FiltEnv.NoteOn();
             PitchEnv.NoteOn();
             Lfo.NoteOn(lfoDelaySamps);
             Lfo2.NoteOn(lfo2DelaySamps);
@@ -107,6 +119,7 @@ namespace PedalFazeR
             AmpEnv.NoteOff();
             DcwEnv.NoteOff();
             DcwEnv2.NoteOff();
+            FiltEnv.NoteOff();
             // Pitch AD env is one-shot; let it finish.
         }
 
@@ -115,6 +128,7 @@ namespace PedalFazeR
             AmpEnv.ForcedRelease(sr);
             DcwEnv.ForcedRelease(sr);
             DcwEnv2.ForcedRelease(sr);
+            FiltEnv.ForcedRelease(sr);
         }
 
         public void Render(in RenderCtx c, float[] mono, int n)
@@ -124,6 +138,7 @@ namespace PedalFazeR
             int   os    = c.Os;
             float invOs = 1f / os;
             float velN  = Velocity * (1f / 127f);
+            float fcStep = 1f - DspMath.Coef(0.003f, c.Sr);   // ~3 ms cutoff smoothing
 
             for (int i = 0; i < n; i++)
             {
@@ -139,6 +154,7 @@ namespace PedalFazeR
                 float aenv  = AmpEnv.Tick();
                 float denv  = DcwEnv.Tick();
                 float denv2 = DcwEnv2.Tick();      // always ticked (cheap); used if engaged
+                float fenv  = FiltEnv.Tick();
                 float penv  = PitchEnv.Tick();
                 float lfo   = Lfo.Tick(c.LfoWaveform, c.LfoInc);
                 float lfo2  = Lfo2.Tick(c.Lfo2Waveform, c.Lfo2Inc);
@@ -183,18 +199,22 @@ namespace PedalFazeR
                 float monoS = Dec.Read();
                 if (c.NoiseLevel > 0f) monoS += Noise.Tick() * c.NoiseLevel;
 
-                // tone filter (control-rate coefficient updates — M1 §9, gate on i)
-                if ((i & 15) == 0)
-                {
-                    float toneFc = c.ToneFcBase;
-                    if (c.ToneTrack > 0f)
-                        toneFc *= DspMath.FastPow2(((CurrentMidi - 60f) / 12f) * c.ToneTrack);
-                    float nyq = c.Sr * 0.49f;
-                    if (toneFc > nyq) toneFc = nyq;
-                    if (toneFc < 20f) toneFc = 20f;
-                    Tone.UpdateCoefs(toneFc, c.ToneRes, c.Sr);
-                }
-                float filtered = Tone.Process(monoS);
+                // filter — cutoff computed per sample and one-pole smoothed (v1.4.1) so a
+                // fast/resonant sweep can't zip and an instant filter-env attack can't slam
+                // the cutoff open (which made a high-Q filter ping at ~cutoff on note onset).
+                float toneFc = c.ToneFcBase;
+                if (c.ToneTrack > 0f)
+                    toneFc *= DspMath.FastPow2(((CurrentMidi - 60f) / 12f) * c.ToneTrack);
+                if (c.FiltEnvAmt != 0f)
+                    toneFc *= DspMath.FastPow2(c.FiltEnvAmt * fenv * FILT_ENV_OCT);
+                float nyq = c.Sr * 0.49f;
+                if (toneFc > nyq) toneFc = nyq;
+                if (toneFc < 20f) toneFc = 20f;
+                if (_fcSmooth < 0f) _fcSmooth = toneFc;               // snap on fresh note
+                else _fcSmooth += (toneFc - _fcSmooth) * fcStep;      // ~3 ms glide
+                _resSmooth += (c.ToneRes - _resSmooth) * fcStep;      // resonance blooms in (~3 ms)
+                Filt.UpdateCoefs(_fcSmooth, _resSmooth, c.Sr);        // cache skips when steady
+                float filtered = Filt.Process(monoS, c.FilterType);
 
                 // amp + tremolo (both LFOs)
                 float amp = aenv * (1f - c.AmpVel + c.AmpVel * velN);

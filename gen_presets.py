@@ -32,6 +32,9 @@ PARAM_INDEX = {
     "LFO2 Delay": 53, "LFO2 Pitch": 54, "LFO2 DCW": 55, "LFO2 Amp": 56,
     # ── New in v1.3 ──
     "Chorus": 57, "Chorus Rate": 58, "Chorus Depth": 59, "Chorus Mix": 60,
+    # ── New in v1.4 ──
+    "Filter Type": 61, "Filter Env Amt": 62, "Filter Attack": 63, "Filter Decay": 64,
+    "Filter Sustain": 65, "Filter Release": 66,
 }
 
 DEFAULTS = {
@@ -49,6 +52,8 @@ DEFAULTS = {
     "LFO2 Wave": 0, "LFO2 Rate": 50, "LFO2 Sync": 0, "LFO2 Division": 2,
     "LFO2 Delay": 0, "LFO2 Pitch": 0, "LFO2 DCW": 0, "LFO2 Amp": 0,
     "Chorus": 0, "Chorus Rate": 30, "Chorus Depth": 50, "Chorus Mix": 50,
+    "Filter Type": 0, "Filter Env Amt": 64, "Filter Attack": 0, "Filter Decay": 60,
+    "Filter Sustain": 80, "Filter Release": 40,
 }
 
 # Wave indices: 0 Sine 1 Saw 2 Square 3 Pulse 4 ResoSaw 5 ResoTri 6 ResoTrap 7 Saw-Pulse
@@ -192,6 +197,26 @@ PRESETS = {
                             "DCW Decay": 60, "DCW Sustain": 25, "DCW Env Amt": 95,
                             "Amp Decay": 85, "Amp Sustain": 30, "Amp Release": 45, "Amp Vel": 80,
                             "Chorus": 1, "Chorus Rate": 34, "Chorus Depth": 45, "Chorus Mix": 55},
+
+    # ── v1.4 feature showcases (resonant filter + new waveshapes) ─────
+    "Bass - Reso Acid":    {"OSC1 Wave": 1, "OSC1 Octave": 1, "OSC1 DCW": 30, "DCW Sustain": 90, "DCW Env Amt": 30,
+                            "Tone": 45, "Tone Res": 105, "Filter Env Amt": 115,
+                            "Filter Decay": 42, "Filter Sustain": 18, "Filter Release": 30,
+                            "Amp Decay": 70, "Amp Sustain": 80, "Amp Release": 20, "Amp Vel": 70},
+    "Lead - Filter Sweep": {"OSC1 Wave": 1, "OSC2 Wave": 1, "OSC2 Fine": 56, "OSC1 DCW": 40, "DCW Sustain": 100,
+                            "Tone": 35, "Tone Res": 70, "Filter Env Amt": 100,
+                            "Filter Attack": 30, "Filter Decay": 95, "Filter Sustain": 55, "Filter Release": 55,
+                            "Amp Sustain": 115, "Amp Release": 50},
+    "FX - HP Riser":       {"OSC1 Wave": 4, "OSC1 DCW": 10, "DCW Sustain": 80, "DCW Env Amt": 70,
+                            "Filter Type": 2, "Tone": 20, "Tone Res": 80, "Filter Env Amt": 120,
+                            "Filter Attack": 90, "Filter Decay": 110, "Filter Sustain": 120,
+                            "Amp Attack": 40, "Amp Sustain": 115, "Amp Release": 70},
+    "Pad - Double Sine":   {"OSC1 Wave": 8, "OSC2 Wave": 8, "OSC2 Level": 100, "OSC2 Fine": 57,
+                            "DCW Attack": 60, "DCW Decay": 95, "DCW Sustain": 70, "DCW Env Amt": 90,
+                            "Amp Attack": 55, "Amp Sustain": 116, "Amp Release": 90,
+                            "Chorus": 1, "Chorus Rate": 22, "Chorus Depth": 55, "Chorus Mix": 65},
+    "Keys - Reso Pulse":   {"OSC1 Wave": 9, "OSC1 DCW": 25, "DCW Decay": 55, "DCW Sustain": 35, "DCW Env Amt": 90,
+                            "DCW Track": 96, "Amp Decay": 80, "Amp Sustain": 30, "Amp Release": 40, "Amp Vel": 85},
 }
 
 

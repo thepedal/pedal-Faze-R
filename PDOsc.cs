@@ -5,7 +5,8 @@ namespace PedalFazeR
     internal enum PDWave
     {
         Sine = 0, Saw = 1, Square = 2, Pulse = 3,
-        ResoSaw = 4, ResoTri = 5, ResoTrap = 6, SawPulse = 7
+        ResoSaw = 4, ResoTri = 5, ResoTrap = 6, SawPulse = 7,
+        DblSine = 8, ResoPulse = 9
     }
 
     // Phase-distortion oscillator (Casio CZ lineage). A linear phase ramp is
@@ -25,7 +26,7 @@ namespace PedalFazeR
         public const float ResoMax = 24f; // max resonance ratio multiplier
 
         public static bool IsReso(PDWave w) =>
-            w == PDWave.ResoSaw || w == PDWave.ResoTri || w == PDWave.ResoTrap;
+            w == PDWave.ResoSaw || w == PDWave.ResoTri || w == PDWave.ResoTrap || w == PDWave.ResoPulse;
 
         // Largest DCW a resonant osc may use at this pitch before the formant
         // carrier (r·f) climbs past ~0.45·sr and aliases (v1.0.1). Musically
@@ -110,6 +111,24 @@ namespace PedalFazeR
                     float r = 1f + d * (ResoMax - 1f);
                     float k = p * r; k -= MathF.Floor(k);
                     float win = 2f * (1f - p); if (win > 1f) win = 1f;        // trapezoid
+                    outv = win * DspMath.Cos01(k);
+                    break;
+                }
+                case PDWave.DblSine:
+                {
+                    // d=0 -> pure sine; rising d crossfades in a second cosine cycle
+                    // (octave up). Both terms close at the wrap, so it stays smooth
+                    // and band-limited regardless of d (no hard edge to alias).
+                    outv = (1f - d) * DspMath.Cos01(p) + d * DspMath.Cos01(p + p);
+                    break;
+                }
+                case PDWave.ResoPulse:
+                {
+                    // Resonant carrier under a squared-saw window — a harder, more
+                    // percussive formant burst than Reso Saw's linear window.
+                    float r = 1f + d * (ResoMax - 1f);
+                    float k = p * r; k -= MathF.Floor(k);
+                    float win = (1f - p); win *= win;
                     outv = win * DspMath.Cos01(k);
                     break;
                 }

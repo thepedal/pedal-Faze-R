@@ -37,8 +37,12 @@ and the reason it sounds like PD rather than a subtractive synth.
   a slow formant sweep under a fast vibrato, etc.
 - **Noise** — a per-voice pink-ish source into the mix, shaped by the amp
   envelope (breathy pads, percussive attacks).
-- **Tone**: a gentle non-resonant 2-pole low-pass with optional key-follow —
-  brightness still comes from the DCW; this is just a tone shaper.
+- **Resonant multimode filter** with its own envelope: Low Pass / Band Pass /
+  High Pass / Notch, plus resonance (`Tone Res`) up to a strong bite, key-follow
+  (`Tone Track`), and a dedicated Filter ADSR + bipolar envelope amount for
+  classic cutoff sweeps. Faze-R's core brightness still comes from the DCW — this
+  is an optional shaper — but it now does proper subtractive moves too. Defaults
+  (Low Pass, no envelope) leave the sound untouched.
 - **Oversample**: Off / 2× / 4× anti-aliasing. PD aliases at high distortion and
   high pitch; 2× (default) cleans it up, Off gives the authentic vintage grit.
 - **Stereo chorus** (post-mix ensemble): the dry engine is mono; switch Chorus on
@@ -47,9 +51,11 @@ and the reason it sounds like PD rather than a subtractive synth.
 
 ### Waveshapes
 
-`Sine` (pure reference), `Saw`, `Square`, `Pulse`, `Saw-Pulse`, and the three
-**resonant** shapes `Reso Saw` / `Reso Tri` / `Reso Trap`. For the bend shapes,
-DCW controls brightness (sine → full character). For the resonant shapes, DCW
+`Sine` (pure reference), `Saw`, `Square`, `Pulse`, `Saw-Pulse`, `Double Sine`
+(morphs from sine toward an octave-rich double cosine as DCW rises), and the four
+**resonant** shapes `Reso Saw` / `Reso Tri` / `Reso Trap` / `Reso Pulse` (the
+last is a harder, more percussive formant burst). For the bend shapes, DCW
+controls brightness (sine → full character). For the resonant shapes, DCW
 controls the **formant ratio** — sweeping DCW sweeps a pitch-tracking resonant
 peak, the CZ's signature trick. Point the DCW envelope at a resonant shape for
 instant filter-style sweeps with no filter at all.
@@ -116,6 +122,35 @@ rebuild to refresh. Only the `.dll` and the `.prs.xml` are needed at runtime;
   a second LFO, per-osc DCW envelopes, and tempo-synced LFO rates.
 
 ## Changelog
+
+### v1.4.1
+- **Fixed a click on resonant filter patches at note onset** (reported on "Bass -
+  Reso Acid" around C#4). With an instant filter-envelope attack the cutoff
+  slammed wide open on the first sample, and the high-Q filter — hit by the note
+  onset from a cleared state — rang at its cutoff (~9 kHz), an audible ping on
+  every attack. The resonance now **blooms up from zero over ~3 ms** on each
+  fresh note, so Q is low through the onset transient (no ping) and settles in
+  cleanly. Onset delta at C#4 dropped from 0.067 to 0.026 (below the steady-state
+  level). The cutoff is also now **smoothed per sample** instead of stepped every
+  16 samples, which removes a separate zipper on fast/high sweeps; a steady cutoff
+  stays bit-identical (the coefficient cache skips the recompute). No parameter or
+  preset changes; patches without a filter envelope are unaffected.
+
+### v1.4
+- **Resonant multimode filter.** The gentle "Tone" lowpass is now a full TPT
+  state-variable filter — Low Pass / Band Pass / High Pass / Notch (`Filter
+  Type`), with resonance up to a strong bite and a dedicated per-voice **filter
+  envelope** (Attack/Decay/Sustain/Release) plus a bipolar `Filter Env Amt` for
+  classic cutoff sweeps. Existing `Tone` / `Tone Track` / `Tone Res` keep their
+  meaning. Defaults (Low Pass, env amt centred → no sweep) leave v1.3.x presets
+  unchanged. The SVF damping is always > 0 so it can't self-oscillate into a NaN.
+- **Two new waveshapes** (Osc Wave now 0–9): `Double Sine` — crossfades from a
+  pure sine toward an octave-up double cosine as DCW rises (smooth, band-limited
+  at all DCW) — and `Reso Pulse`, a resonant shape with a squared window for a
+  harder, more percussive formant burst (covered by the anti-alias DCW clamp).
+- Five demo presets added (Bass - Reso Acid, Lead - Filter Sweep, FX - HP Riser,
+  Pad - Double Sine, Keys - Reso Pulse) → 46 total. Validated by re-fuzzing all
+  67 params incl. every filter mode at full resonance: zero faults.
 
 ### v1.3.1
 - **Fixed an intermittent chorus crash** (silent machine death). In the chorus
