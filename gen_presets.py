@@ -30,6 +30,8 @@ PARAM_INDEX = {
     "DCW2 Release": 47, "DCW2 Env Amt": 48,
     "LFO2 Wave": 49, "LFO2 Rate": 50, "LFO2 Sync": 51, "LFO2 Division": 52,
     "LFO2 Delay": 53, "LFO2 Pitch": 54, "LFO2 DCW": 55, "LFO2 Amp": 56,
+    # ── New in v1.3 ──
+    "Chorus": 57, "Chorus Rate": 58, "Chorus Depth": 59, "Chorus Mix": 60,
 }
 
 DEFAULTS = {
@@ -46,6 +48,7 @@ DEFAULTS = {
     "DCW2 Release": 50, "DCW2 Env Amt": 90,
     "LFO2 Wave": 0, "LFO2 Rate": 50, "LFO2 Sync": 0, "LFO2 Division": 2,
     "LFO2 Delay": 0, "LFO2 Pitch": 0, "LFO2 DCW": 0, "LFO2 Amp": 0,
+    "Chorus": 0, "Chorus Rate": 30, "Chorus Depth": 50, "Chorus Mix": 50,
 }
 
 # Wave indices: 0 Sine 1 Saw 2 Square 3 Pulse 4 ResoSaw 5 ResoTri 6 ResoTrap 7 Saw-Pulse
@@ -179,6 +182,16 @@ PRESETS = {
                             "DCW2 Env": 1, "DCW2 Attack": 80, "DCW2 Decay": 100, "DCW2 Sustain": 80, "DCW2 Env Amt": 120,
                             "LFO2 DCW": 35, "LFO2 Rate": 30,
                             "Amp Attack": 25, "Amp Sustain": 115, "Amp Release": 55},
+
+    # ── v1.3 feature showcases ───────────────────────────────────────
+    "Pad - Wide Ensemble": {"OSC1 Wave": 1, "OSC2 Wave": 1, "OSC2 Level": 100, "OSC2 Fine": 57,
+                            "DCW Attack": 60, "DCW Decay": 95, "DCW Sustain": 80, "DCW Env Amt": 70,
+                            "Amp Attack": 60, "Amp Sustain": 118, "Amp Release": 95,
+                            "Chorus": 1, "Chorus Rate": 24, "Chorus Depth": 55, "Chorus Mix": 70},
+    "Keys - Chorus EP":    {"OSC1 Wave": 0, "OSC2 Wave": 4, "OSC2 Level": 75, "OSC2 Octave": 3,
+                            "DCW Decay": 60, "DCW Sustain": 25, "DCW Env Amt": 95,
+                            "Amp Decay": 85, "Amp Sustain": 30, "Amp Release": 45, "Amp Vel": 80,
+                            "Chorus": 1, "Chorus Rate": 34, "Chorus Depth": 45, "Chorus Mix": 55},
 }
 
 

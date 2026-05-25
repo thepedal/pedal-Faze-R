@@ -37,6 +37,8 @@ namespace PedalFazeR
 
         readonly IBuzzMachineHost host;
         readonly Voice[] _voices = new Voice[MAX_VOICES];
+        readonly StereoChorus _chorus = new StereoChorus();
+        int  _chorusFlush;                        // buffers to keep the chorus tail alive after idle
         float[] _mono = new float[8192];
         bool _wasPlaying;
         int _lastSr;
@@ -203,6 +205,17 @@ namespace PedalFazeR
         [ParameterDecl(Name = "LFO2 Amp", MinValue = 0, MaxValue = 127, DefValue = 0)]
         public int Lfo2Amp { get; set; } = 0;
 
+        // ── New in v1.3 — stereo ensemble chorus (post-mix). Off = mono passthrough. ──
+        [ParameterDecl(Name = "Chorus", MinValue = 0, MaxValue = 1, DefValue = 0,
+            ValueDescriptions = new[] { "Off", "On" })]
+        public int Chorus { get; set; } = 0;
+        [ParameterDecl(Name = "Chorus Rate", MinValue = 0, MaxValue = 127, DefValue = 30)]
+        public int ChorusRate { get; set; } = 30;
+        [ParameterDecl(Name = "Chorus Depth", MinValue = 0, MaxValue = 127, DefValue = 50)]
+        public int ChorusDepth { get; set; } = 50;
+        [ParameterDecl(Name = "Chorus Mix", MinValue = 0, MaxValue = 127, DefValue = 50)]
+        public int ChorusMix { get; set; } = 50;
+
         // Free or tempo-locked LFO increment per output sample.
         float LfoIncFor(int sync, int rateParam, int division, int sr)
         {
@@ -326,6 +339,7 @@ namespace PedalFazeR
             if (sr != _lastSr)
             {
                 foreach (var v in _voices) { v.Tone.Reset(); v.Dec.Reset(); v.Noise.Reset(); }
+                _chorus.Configure(sr);
                 _lastSr = sr;
             }
 
@@ -362,17 +376,44 @@ namespace PedalFazeR
                 any = true;
             }
 
-            if (!any)                                     // fully idle — let downstream sleep
+            bool chOn = Chorus == 1;
+
+            // Keep the chorus tail (~max delay) alive briefly after the last voice
+            // goes idle, so the ring-out isn't chopped (would click). No feedback,
+            // so the tail is short — a few buffers cover it.
+            if (any) _chorusFlush = chOn ? (int)(0.03f * sr / Math.Max(1, n)) + 2 : 0;
+
+            if (!any && (!chOn || _chorusFlush <= 0))     // fully idle — let downstream sleep
             {
                 for (int i = 0; i < n; i++) { output[i].L = 0f; output[i].R = 0f; }
+                if (chOn) _chorus.Reset();                // clear tail so the next start is clean
                 return false;
             }
+            if (!any) _chorusFlush--;                     // flushing silence through the chorus tail
 
             float volN = Volume * (1f / 127f);
+
+            if (!chOn)
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    float s = DspMath.SoftClip(_mono[i] * MIX_HEADROOM * volN) * SAMPLE_SCALE;
+                    output[i].L = s; output[i].R = s;     // mono passthrough (back-compat)
+                }
+                return true;
+            }
+
+            float incPhase   = DspMath.TimeMap(ChorusRate, 0.05f, 6f) / sr;     // 0.05..6 Hz
+            float depthSamps  = (ChorusDepth * (1f / 127f)) * 0.006f * sr;      // up to ±6 ms
+            float m   = ChorusMix * (1f / 127f);
+            float dryG = MathF.Cos(m * 1.5707963f);       // equal-power wet/dry
+            float wetG = MathF.Sin(m * 1.5707963f);
             for (int i = 0; i < n; i++)
             {
-                float s = DspMath.SoftClip(_mono[i] * MIX_HEADROOM * volN) * SAMPLE_SCALE;
-                output[i].L = s; output[i].R = s;
+                float dry = _mono[i] * MIX_HEADROOM * volN;     // pre-clip into the chorus
+                _chorus.Process(dry, incPhase, depthSamps, dryG, wetG, out float l, out float r);
+                output[i].L = DspMath.SoftClip(l) * SAMPLE_SCALE;   // bound like the dry path
+                output[i].R = DspMath.SoftClip(r) * SAMPLE_SCALE;
             }
             return true;
         }

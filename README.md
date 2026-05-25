@@ -41,6 +41,9 @@ and the reason it sounds like PD rather than a subtractive synth.
   brightness still comes from the DCW; this is just a tone shaper.
 - **Oversample**: Off / 2× / 4× anti-aliasing. PD aliases at high distortion and
   high pitch; 2× (default) cleans it up, Off gives the authentic vintage grit.
+- **Stereo chorus** (post-mix ensemble): the dry engine is mono; switch Chorus on
+  to bloom it into a wide stereo image. Rate / Depth / Mix; default Off (mono
+  passthrough). PD is famously dry — this is the ensemble it usually gets.
 
 ### Waveshapes
 
@@ -113,6 +116,25 @@ rebuild to refresh. Only the `.dll` and the `.prs.xml` are needed at runtime;
   a second LFO, per-osc DCW envelopes, and tempo-synced LFO rates.
 
 ## Changelog
+
+### v1.3.1
+- **Fixed an intermittent chorus crash** (silent machine death). In the chorus
+  delay read, when the modulated read position landed an ulp below zero, wrapping
+  it by `+bufferSize` rounded to *exactly* `bufferSize` in float — one index past
+  the buffer — throwing on roughly 1 sample in many thousand. Rare per-sample, but
+  near-certain over a few seconds of chorus, and untied to any one parameter
+  (which is why it seemed random). Added a high-side wrap so the read index is
+  always in range. Found by fuzzing all 61 params; re-verified over ~130M samples
+  with zero faults.
+
+### v1.3
+- **Stereo chorus.** The engine was mono out; a post-mix ensemble chorus (one
+  delay line, two quadrature LFO taps for L/R) opens it into a wide stereo image
+  — the bloom dry phase-distortion usually needs. Params: Chorus (Off/On), Rate,
+  Depth, Mix. Defaults **Off** → exact mono passthrough, so existing presets are
+  unchanged. Output is soft-clipped post-chorus to stay within nominal range, and
+  the tail is flushed on idle so the ring-out isn't chopped. Two demo presets
+  added (Pad - Wide Ensemble, Keys - Chorus EP) → 41 total.
 
 ### v1.2
 - **Independent per-oscillator DCW envelope.** Osc2 can run its own DCW
